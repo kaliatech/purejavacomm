@@ -47,6 +47,9 @@ public class CommPortIdentifier {
 	private volatile int m_PortType;
 	private volatile CommPort m_CommPort;
 	private volatile CommDriver m_Driver;
+	
+	private volatile static Hashtable<String, CommPortIdentifier> m_KnownPortIdentifiers = new Hashtable<String, CommPortIdentifier>();
+	
 	private volatile static Hashtable<String, CommPortIdentifier> m_PortIdentifiers = new Hashtable<String, CommPortIdentifier>();
 	private volatile static Hashtable<CommPort, CommPortIdentifier> m_OpenPorts = new Hashtable<CommPort, CommPortIdentifier>();
 	private volatile static Hashtable<CommPortIdentifier, String> m_Owners = new Hashtable<CommPortIdentifier, String>();
@@ -85,6 +88,10 @@ public class CommPortIdentifier {
 				if (portid != null)
 					return portid;
 
+				portid = m_KnownPortIdentifiers.get(portName);
+				if (portid != null)
+					return portid;
+				
 				// check if we can open a port with the given name
 				int fd = jtermios.JTermios.open(portName, O_RDWR | O_NOCTTY | O_NONBLOCK);
 				if (fd != -1) { // yep, it exists, so close it and create a port id object for it
@@ -177,9 +184,27 @@ public class CommPortIdentifier {
 						m_PortIDs.add(portid);
 					// and now add the PureSerialPorts
 					List<String> pureports = getPortList();
-					if (pureports != null)
-						for (String name : pureports)
-							m_PortIDs.add(new CommPortIdentifier(name, PORT_SERIAL, null));
+					if (pureports != null) {
+						for (String name : pureports) {
+							
+							// check for known port identifiers and reuse if exists
+							CommPortIdentifier existingPortId = m_KnownPortIdentifiers.get(name);  
+							if (existingPortId != null) {
+								m_PortIDs.add(existingPortId);
+							}
+							else {
+								m_PortIDs.add(new CommPortIdentifier(name, PORT_SERIAL, null));
+							}
+							
+						}
+					}
+					
+					// clear and store the new list of known ports
+					m_KnownPortIdentifiers.clear();
+					for(CommPortIdentifier portId: m_PortIDs) {
+						m_KnownPortIdentifiers.put(portId.getName(), portId);
+					}
+					
 				}
 				Iterator<CommPortIdentifier> m_Iterator = m_PortIDs.iterator();
 
